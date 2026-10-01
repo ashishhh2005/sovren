@@ -9,7 +9,7 @@ import os
 # Gemini exposes an OpenAI-compatible endpoint, so the openai SDK works unchanged.
 GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/openai/"
 CHAT_MODEL = "gemini-2.0-flash"
-EMBED_MODEL = "text-embedding-004"
+EMBED_MODEL = "gemini-embedding-001"
 
 
 def get_key() -> str | None:
