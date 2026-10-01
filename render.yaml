@@ -1,12 +1,11 @@
 # Render deployment config for the Sovren backend.
-# On Render: New > Blueprint, point it at your GitHub repo, and this file is read automatically.
 services:
   - type: web
     name: sovren-backend
     runtime: python
-    rootDir: backend
+    plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: OPENAI_API_KEY
-        sync: false   # you paste this in the Render dashboard — it is never committed
+        sync: false   # paste this in the Render dashboard — never committed
