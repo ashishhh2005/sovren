@@ -106,14 +106,20 @@ def run_agent(question: str, retrieved: list[dict]) -> dict:
     tool_schemas = [schema for (_, schema) in TOOLS.values()]
 
     try:
-        # First call: let the model answer or request a tool.
-        resp = llm.chat.completions.create(
-            model=CHAT_MODEL, messages=messages, tools=tool_schemas
-        )
+        # First call: let the model answer or request a tool. Some providers are
+        # strict about the tools schema, so if that call fails we retry without
+        # tools — the grounded answer still comes back, just without tool use.
+        try:
+            resp = llm.chat.completions.create(
+                model=CHAT_MODEL, messages=messages, tools=tool_schemas
+            )
+        except Exception as tool_err:
+            trace.append({"step": "tools_unavailable", "detail": str(tool_err)})
+            resp = llm.chat.completions.create(model=CHAT_MODEL, messages=messages)
         msg = resp.choices[0].message
 
         # If the model asked for tools, run them and record each in the trace.
-        if msg.tool_calls:
+        if getattr(msg, "tool_calls", None):
             messages.append(msg)
             for call in msg.tool_calls:
                 fn, _ = TOOLS[call.function.name]
