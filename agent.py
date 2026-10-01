@@ -105,26 +105,35 @@ def run_agent(question: str, retrieved: list[dict]) -> dict:
     ]
     tool_schemas = [schema for (_, schema) in TOOLS.values()]
 
-    # First call: let the model answer or request a tool.
-    resp = llm.chat.completions.create(
-        model=CHAT_MODEL, messages=messages, tools=tool_schemas
-    )
-    msg = resp.choices[0].message
-
-    # If the model asked for tools, run them and record each in the trace.
-    if msg.tool_calls:
-        messages.append(msg)
-        for call in msg.tool_calls:
-            fn, _ = TOOLS[call.function.name]
-            args = json.loads(call.function.arguments)
-            result = fn(**args)
-            trace.append({"step": "tool", "name": call.function.name, "args": args, "result": result})
-            messages.append(
-                {"role": "tool", "tool_call_id": call.id, "content": json.dumps(result)}
-            )
-        # Second call: model writes the final answer using the tool results.
-        resp = llm.chat.completions.create(model=CHAT_MODEL, messages=messages)
+    try:
+        # First call: let the model answer or request a tool.
+        resp = llm.chat.completions.create(
+            model=CHAT_MODEL, messages=messages, tools=tool_schemas
+        )
         msg = resp.choices[0].message
 
-    trace.append({"step": "answer"})
-    return {"answer": msg.content, "trace": trace}
+        # If the model asked for tools, run them and record each in the trace.
+        if msg.tool_calls:
+            messages.append(msg)
+            for call in msg.tool_calls:
+                fn, _ = TOOLS[call.function.name]
+                args = json.loads(call.function.arguments)
+                result = fn(**args)
+                trace.append({"step": "tool", "name": call.function.name, "args": args, "result": result})
+                messages.append(
+                    {"role": "tool", "tool_call_id": call.id, "content": json.dumps(result)}
+                )
+            # Second call: model writes the final answer using the tool results.
+            resp = llm.chat.completions.create(model=CHAT_MODEL, messages=messages)
+            msg = resp.choices[0].message
+
+        trace.append({"step": "answer"})
+        return {"answer": msg.content, "trace": trace}
+    except Exception as e:
+        # Never hard-crash the request: fall back to the top retrieved passage.
+        trace.append({"step": "error", "detail": str(e)})
+        fallback = retrieved[0]["text"] if retrieved else "No relevant policy found."
+        return {
+            "answer": "Most relevant policy section:\n\n" + fallback,
+            "trace": trace,
+        }

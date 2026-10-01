@@ -8,7 +8,7 @@ import os
 
 # Gemini exposes an OpenAI-compatible endpoint, so the openai SDK works unchanged.
 GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/openai/"
-CHAT_MODEL = "gemini-2.0-flash"
+CHAT_MODEL = "gemini-3.8-flash"
 EMBED_MODEL = "gemini-embedding-001"
 
 
