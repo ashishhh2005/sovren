@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# Secrets — never commit your API key
+.env
+
+# OS
+.DS_Store
