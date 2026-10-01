@@ -21,13 +21,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from agent import run_agent
+from llm import EMBED_MODEL, client, get_key
 
 load_dotenv()
 
 # --- Config ---
 KNOWLEDGE_DIR = os.path.join(os.path.dirname(__file__), "knowledge")
 TOP_K = 3  # how many chunks to retrieve per question
-EMBED_MODEL = "text-embedding-3-small"  # OpenAI embeddings — cheap and small
 
 app = FastAPI(title="Sovren API")
 
@@ -62,11 +62,8 @@ def load_and_chunk() -> tuple[list[str], list[str]]:
 
 
 def embed(texts: list[str]) -> np.ndarray:
-    """Turn texts into normalized embedding vectors using the OpenAI API."""
-    from openai import OpenAI
-
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    resp = client.embeddings.create(model=EMBED_MODEL, input=texts)
+    """Turn texts into normalized embedding vectors using the Gemini API."""
+    resp = client().embeddings.create(model=EMBED_MODEL, input=texts)
     vecs = np.array([d.embedding for d in resp.data], dtype=np.float32)
     # Normalize so a dot product equals cosine similarity.
     vecs /= np.linalg.norm(vecs, axis=1, keepdims=True) + 1e-9
@@ -78,7 +75,7 @@ def startup() -> None:
     """Load chunks and, if a key is set, pre-compute an embedding for each one."""
     global chunks, chunk_sources, chunk_vectors
     chunks, chunk_sources = load_and_chunk()
-    if os.getenv("OPENAI_API_KEY"):
+    if get_key():
         try:
             chunk_vectors = embed(chunks)
             print(f"Sovren: embedded {len(chunks)} chunks")
@@ -86,7 +83,7 @@ def startup() -> None:
             print(f"Sovren: embedding failed ({e}); using keyword fallback")
             chunk_vectors = None
     else:
-        print("Sovren: no OPENAI_API_KEY; using keyword-overlap retrieval")
+        print("Sovren: no GEMINI_API_KEY; using keyword-overlap retrieval")
 
 
 def retrieve(question: str, k: int = TOP_K) -> list[dict]:

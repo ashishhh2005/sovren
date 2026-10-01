@@ -12,6 +12,8 @@ How it works (standard tool-calling loop):
 import json
 import os
 
+from llm import CHAT_MODEL, client, get_key
+
 # --- The tools the agent can use ---------------------------------------------
 # Each is a plain Python function. In a real system these hit a ticketing API,
 # a database, etc. Here they're simple stand-ins so the loop is easy to follow.
@@ -79,16 +81,14 @@ def run_agent(question: str, retrieved: list[dict]) -> dict:
         {"step": "retrieve", "sources": [r["source"] for r in retrieved]}
     ]
 
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = get_key()
     if not api_key:
         return {
-            "answer": "(no LLM key set — set OPENAI_API_KEY to enable the agent)",
+            "answer": "(no LLM key set — set GEMINI_API_KEY to enable the agent)",
             "trace": trace,
         }
 
-    from openai import OpenAI
-
-    client = OpenAI(api_key=api_key)
+    llm = client()
     context = "\n\n".join(f"[{r['source']}]\n{r['text']}" for r in retrieved)
 
     messages = [
@@ -106,8 +106,8 @@ def run_agent(question: str, retrieved: list[dict]) -> dict:
     tool_schemas = [schema for (_, schema) in TOOLS.values()]
 
     # First call: let the model answer or request a tool.
-    resp = client.chat.completions.create(
-        model="gpt-4o-mini", messages=messages, tools=tool_schemas
+    resp = llm.chat.completions.create(
+        model=CHAT_MODEL, messages=messages, tools=tool_schemas
     )
     msg = resp.choices[0].message
 
@@ -123,7 +123,7 @@ def run_agent(question: str, retrieved: list[dict]) -> dict:
                 {"role": "tool", "tool_call_id": call.id, "content": json.dumps(result)}
             )
         # Second call: model writes the final answer using the tool results.
-        resp = client.chat.completions.create(model="gpt-4o-mini", messages=messages)
+        resp = llm.chat.completions.create(model=CHAT_MODEL, messages=messages)
         msg = resp.choices[0].message
 
     trace.append({"step": "answer"})
